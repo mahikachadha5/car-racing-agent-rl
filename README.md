@@ -1,2 +1,1 @@
-# mario-bros-playing-agent
-
+# car-racing-agent-rl
