@@ -21,5 +21,6 @@ A top-down 96x96 RGB image of the car and race track.
 ### Rewards
 The reward is -0.1 for every frame and +1000/N for every track tile visited, where N is the total number of tiles visited in the track.
 
-## DQN
-Because this problem consists of a very large observation space and a small discrete action space. A Deep Q-Network (DQN) is the algorithm of choice for obtaining a solution.
+## Network Architecture
+The Q-network is a CNN that takes 4 stacked 84x84 grayscale frames as input. Two convolutional layers (16 filters with 8x8 kernels, then 32 filters with 4x4 kernels) extract spatial features and reduce dimensionality from 84x84 to 9x9. The 9x9 output is then flattened and passed through a fully connected layer (256 units) before producing 5 Q-values — one for each discrete action (do nothing, steer left, steer right, gas, brake).
+
