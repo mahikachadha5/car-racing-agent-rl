@@ -86,16 +86,21 @@ class DQN:
             
             # Tracked for syncing policy and target network
             step_count = 0
-
-            # policy network optimizer
-            self.optimizer = torch.optim.Adam(
-                policy_net.parameters(), lr=self.learning_rate_a
-            )
-
-        rewards_per_episode = []
-        epsilon_history = []
-
-        # keep training until we are satisfied with results
+            
+            # List to keep track of epsilon decay
+            epsilon_history = []
+            
+            # Track best reward
+            best_reward = -999999999
+            rewards_per_episode = []
+        else:
+            # Load saved policy
+            policy_net.load_state_dict(torch.load(self.MODEL_FILE))
+            
+            # Evaluate Model
+            policy_net.eval()
+            
+        # Keep training until we are satisfied with results or need to tweak hyperparameters
         for episode in itertools.count():
             state, _ = env.reset()
             state = torch.tensor(state, dtype=torch.float, device=device)
