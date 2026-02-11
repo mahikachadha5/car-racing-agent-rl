@@ -29,6 +29,7 @@ class DQN:
 
         self.loss_fn = nn.MSELoss()
         self.optimizer = None
+        self.replay_buffer_size = hyperparameters["replay_buffer_size"] # size of replay buffer
 
     def run(self, is_training=True, render=False):
         env = gym.make(
@@ -42,8 +43,8 @@ class DQN:
         policy_net = CNNActionValue(state_dim[0], action_dim).to(device)
 
         if is_training:
-            replay_buffer = ReplayBuffer(self.replay_memory_size)
-
+            # Initialize epsilon and replay buffer
+            replay_buffer = ReplayBuffer(self.replay_buffer_size)
             epsilon = self.epsilon_init
             target_net = CNNActionValue(state_dim[0], action_dim).to(device)
             # sync target network to policy network
