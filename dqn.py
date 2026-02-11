@@ -113,16 +113,19 @@ class DQN:
                 else:
                     with torch.no_grad():
                         # tensor([1, 2, 3, ...]) ===> tensor([[1, 2, 3, ...]])
-                        action = policy_net(state.unsqueeze(dim=0)).squeeze().argmax()
+                        action = (
+                            policy_net(state.unsqueeze(dim=0)).squeeze().argmax().item()
+                        )
 
                 # processing:
-                new_state, reward, terminated, _, info = env.step(action.item())
+                new_state, reward, terminated, _, info = env.step(action)
 
                 # accumulate reward
                 episode_reward += reward
 
                 new_state = torch.tensor(new_state, dtype=torch.float, device=device)
                 reward = torch.tensor(reward, dtype=torch.float, device=device)
+                action = torch.tensor(action, dtype=torch.float, device=device)
 
                 if is_training:
                     replay_buffer.append((state, action, new_state, reward, terminated))
