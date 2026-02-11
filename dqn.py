@@ -8,10 +8,23 @@ from replay_buffer import ReplayBuffer
 import itertools
 import yaml
 import random
+import os
+import matplotlib
+import matplotlib.pyplot as plt
+import datetime
+import numpy as np
+import argparse
+
+
+DATE_FORMAT = "%m-%d %H:%M:%S"
+
+RUNS_DIR = "runs"
+os.makedirs(RUNS_DIR, exist_ok=True)
+
+# To save plots as images
+matplotlib.use("Agg")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-
 class DQN:
     def __init__(self, hyperparameter_set):
         with open("hyperparameters.yml", "r") as file:
@@ -30,11 +43,24 @@ class DQN:
         self.loss_fn = nn.MSELoss()
         self.optimizer = None
         self.replay_buffer_size = hyperparameters["replay_buffer_size"] # size of replay buffer
+        # Paths
+        self.LOG_FILE = os.path.join(RUNS_DIR, f'{self.hyperparameter_set}.log')
+        self.MODEL_FILE = os.path.join(RUNS_DIR, f'{self.hyperparameter_set}.pt')
+        self.GRAPH_FILE = os.path.join(RUNS_DIR, f'{self.hyperparameter_set}.png')
 
     def run(self, is_training=True, render=False):
         env = gym.make(
             "CarRacing-v3", render_mode="human" if render else None, continuous=False
         )
+        if is_training:
+            start_time = datetime.now()
+            last_graph_update_time = start_time
+            
+            message = f"{start_time.strftime(DATE_FORMAT)}: Training starting..."
+            print(message)
+            with open(self.LOG_FILE, 'w') as file:
+                file.write(message + "\n")
+                
         env = ImageEnv(env)
 
         state_dim = (4, 84, 84)
@@ -102,6 +128,23 @@ class DQN:
             epsilon_history.append(epsilon)
 
             # if we have enough experiences
+            
+            # Save model wehn new best reward is obtained
+            if is_training:
+                if episode_reward > best_reward:
+                    message = f"{datetime.now().strftime(DATE_FORMAT)}: New best reward {episode_reward:0.1f} ({(episode_reward-best_reward)})"
+                    print(message)
+                    with open(self.LOG_FILE, 'a') as file:
+                        file.write(message + '\n')
+                        
+                    torch.save(policy_net.state_dict(), self.MODEL_FILE)
+                    best_reward = episode_reward
+                
+                current_time = datetime.now()
+                if current_time - last_graph_update_time > timedelta(seconds=10):
+                    self.save_graph(rewards_per_episode, epsilon_history)
+                    last_graph_update_time = current_time
+
             if len(replay_buffer) > self.mini_batch_size:
                 # sample from memory
                 mini_batch = replay_buffer.sample(self.mini_batch_size)
@@ -141,6 +184,30 @@ class DQN:
         self.optimizer.zero_grad()  # Clear gradients
         loss.backward()             # Compute gradients (backpropagation)
         self.optimizer.step()       # Update network parameters i.e. weights and biases
+        
+        
+    def save_graph(self, rewards_per_episode, epsilon_history):
+        # Save plots
+        fig = plt.figure()
+        
+        # Plot avg rewards (Y-axis) vs episodes (X-Axis)
+        mean_rewards = np.zeroes(len(rewards_per_episode))
+        for x in range(len(mean_rewards)):
+            mean_rewards[x] = np.mean(rewards_per_episode[max(0, x-99):(x+1)])
+        plt.subplot(122) # plot on a 1 row x 2 col grid
+        plt.ylabel('Mean Rewards')
+        plt.plot(mean_rewards)
+        
+        # Plot epsilon decay (Y-axis) vs episodes (X-axis)
+        plt.subplot(122)
+        plt.ylabel('Epsilon Decay')
+        plt.plot(epsilon_history)
+        
+        plt.subplots_adjust(wspace=1.0, hspace=1.0)
+
+        # Save plots
+        fig.savefig(self.GRAPH_FILE)
+        plt.close(fig)
 
 
 if __name__ == "__main__":
