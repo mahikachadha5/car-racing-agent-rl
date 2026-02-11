@@ -113,24 +113,33 @@ class DQN:
 
     # Calculates target and trains the policy network
     def optimize(self, mini_batch, policy_net, target_net):
-        for state, action, new_state, reward, terminated in mini_batch:
-            if terminated:
-                target = reward
-            else:
-                with torch.no_grad():
-                    target_q = (
-                        reward + self.discount_factor_g * target_net(new_state).max()
-                    )
+        # Process the batch all at once rather than one experience at a time
+        
+        # Transpose the list of experiences and separate at each element
+        states, actions, new_states, rewards, terminations = zip(*mini_batch)
+        
+        # Stack tensors to create batch tensors
+        # tensor([[1,2,3]])
+        states = torch.stack(states)
+        actions = torch.stack(actions)
+        new_states = torch.stack(new_states)
+        rewards = torch.stack(rewards)
+        terminations = torch.tensor(terminations).float().to(device)
+        
+        with torch.no_grad():
+            # Calculate target Q-values
+            target_q = rewards + (1-terminations) * self.discount_factor_g * target_net(new_states).max(dim=1)[0]
+            
+        # Calculate Q-values from current policy
+        current_q = policy_net(states).gather(dim=1, index=actions.unsqueeze(dim=1)).squeeze()
+        
+        # Compute loss for the whole minibatch
+        loss = self.loss_fn(current_q, target_q)
 
-            current_q = policy_net(state)
-
-            # Compute loss for the whole minibatch
-            loss = self.loss_fn(current_q, target_q)
-
-            # Optimize the model
-            self.optimizer.zero_grad()  # Clear gradients
-            loss.backward()  # Compute gradients (backpropagation)
-            self.optimizer.step()  # Update network parameters i.e. weights and biases
+        # Optimize the model
+        self.optimizer.zero_grad()  # Clear gradients
+        loss.backward()             # Compute gradients (backpropagation)
+        self.optimizer.step()       # Update network parameters i.e. weights and biases
 
 
 if __name__ == "__main__":
