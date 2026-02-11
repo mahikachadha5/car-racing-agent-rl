@@ -23,6 +23,12 @@ class DQN:
         self.epsilon_init = hyperparameters["epsilon_init"]
         self.epsilon_decay = hyperparameters["epsilon_decay"]
         self.epsilon_min = hyperparameters["epsilon_min"]
+        self.network_sync_rate = hyperparameters["network_sync_rate"]
+        self.discount_factor_g = hyperparameters["discount_factor_g"]
+        self.learning_rate_a = hyperparameters["learning_rate_a"]
+
+        self.loss_fn = nn.MSELoss()
+        self.optimizer = None
 
     def run(self, is_training=True, render=False):
         env = gym.make(
@@ -33,12 +39,22 @@ class DQN:
         state_dim = (4, 84, 84)
         action_dim = env.action_space.n
 
-        policy = CNNActionValue(state_dim[0], action_dim).to(device)
+        policy_net = CNNActionValue(state_dim[0], action_dim).to(device)
 
         if is_training:
             replay_buffer = ReplayBuffer(self.replay_memory_size)
 
             epsilon = self.epsilon_init
+            target_net = CNNActionValue(state_dim[0], action_dim).to(device)
+            # sync target network to policy network
+            target_net.load_state_dict(policy_net.state_dict())
+
+            step_count = 0
+
+            # policy network optimizer
+            self.optimizer = torch.optim.Adam(
+                policy_net.parameters(), lr=self.learning_rate_a
+            )
 
         rewards_per_episode = []
         epsilon_history = []
@@ -53,11 +69,11 @@ class DQN:
             while not terminated:
                 if is_training and random.random() < epsilon:
                     action = env.action_space.sample()
-                    #action = torch.tensor(action, dtype=torch.float, device=device)
+                    # action = torch.tensor(action, dtype=torch.float, device=device)
                 else:
                     with torch.no_grad():
                         # tensor([1, 2, 3, ...]) ===> tensor([[1, 2, 3, ...]])
-                        action = policy(state.unsqueeze(dim=0)).squeeze().argmax()
+                        action = policy_net(state.unsqueeze(dim=0)).squeeze().argmax()
 
                 # processing:
                 new_state, reward, terminated, _, info = env.step(action.item())
@@ -70,6 +86,7 @@ class DQN:
 
                 if is_training:
                     replay_buffer.append((state, action, new_state, reward, terminated))
+                    step_count += 1
 
                 # move to the new state
                 state = new_state
@@ -83,6 +100,39 @@ class DQN:
             epsilon = max(epsilon * self.epsilon_decay, self.epsilon_min)
             epsilon_history.append(epsilon)
 
-if __name__ == '__main__':
-    agent = DQN('car_racing3')
+            # if we have enough experiences
+            if len(replay_buffer) > self.mini_batch_size:
+                # sample from memory
+                mini_batch = replay_buffer.sample(self.mini_batch_size)
+                self.optimize(mini_batch, policy_net, target_net)
+
+                # copy policy network to target network after a certain number of steps
+                if step_count > self.network_sync_rate:
+                    target_net.load_state_dict(policy_net.state_dict())
+                    step_count = 0
+
+    # Calculates target and trains the policy network
+    def optimize(self, mini_batch, policy_net, target_net):
+        for state, action, new_state, reward, terminated in mini_batch:
+            if terminated:
+                target = reward
+            else:
+                with torch.no_grad():
+                    target_q = (
+                        reward + self.discount_factor_g * target_net(new_state).max()
+                    )
+
+            current_q = policy_net(state)
+
+            # Compute loss for the whole minibatch
+            loss = self.loss_fn(current_q, target_q)
+
+            # Optimize the model
+            self.optimizer.zero_grad()  # Clear gradients
+            loss.backward()  # Compute gradients (backpropagation)
+            self.optimizer.step()  # Update network parameters i.e. weights and biases
+
+
+if __name__ == "__main__":
+    agent = DQN("car_racing3")
     agent.run(is_training=True, render=True)
