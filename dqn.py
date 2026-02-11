@@ -25,33 +25,36 @@ os.makedirs(RUNS_DIR, exist_ok=True)
 matplotlib.use("Agg")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+# Deep Q-Learning Agent
 class DQN:
     def __init__(self, hyperparameter_set):
+        self.hyperparameter_set = hyperparameter_set
         with open("hyperparameters.yml", "r") as file:
             all_hyperparameter_sets = yaml.safe_load(file)
             hyperparameters = all_hyperparameter_sets[hyperparameter_set]
 
-        self.replay_memory_size = hyperparameters["replay_memory_size"]
-        self.mini_batch_size = hyperparameters["mini_batch_size"]
-        self.epsilon_init = hyperparameters["epsilon_init"]
-        self.epsilon_decay = hyperparameters["epsilon_decay"]
-        self.epsilon_min = hyperparameters["epsilon_min"]
-        self.network_sync_rate = hyperparameters["network_sync_rate"]
-        self.discount_factor_g = hyperparameters["discount_factor_g"]
-        self.learning_rate_a = hyperparameters["learning_rate_a"]
-
-        self.loss_fn = nn.MSELoss()
-        self.optimizer = None
+        # Hyperparameters
+        self.env_id = hyperparameters["env_id"]
         self.replay_buffer_size = hyperparameters["replay_buffer_size"] # size of replay buffer
+        self.mini_batch_size = hyperparameters["mini_batch_size"]       # size of the training data set samples from replay buffer
+        self.epsilon_init = hyperparameters["epsilon_init"]             # 1 = 100% random actions
+        self.epsilon_decay = hyperparameters["epsilon_decay"]           # epsilon decay rate
+        self.epsilon_min = hyperparameters["epsilon_min"]               # minimum epsilon value
+        self.network_sync_rate = hyperparameters["network_sync_rate"]   # number of steps the agent takes before syncing the policy
+        self.discount_factor_g = hyperparameters["discount_factor_g"]   # discount rate (gamma)
+        self.learning_rate_a = hyperparameters["learning_rate_a"]       # learning rate (alpha)
+
+        # Neural Network
+        self.loss_fn = nn.MSELoss() # NN Loss Function: Mean Squared Error
+        self.optimizer = None       # NN Optimizer
+        
         # Paths
         self.LOG_FILE = os.path.join(RUNS_DIR, f'{self.hyperparameter_set}.log')
         self.MODEL_FILE = os.path.join(RUNS_DIR, f'{self.hyperparameter_set}.pt')
         self.GRAPH_FILE = os.path.join(RUNS_DIR, f'{self.hyperparameter_set}.png')
 
     def run(self, is_training=True, render=False):
-        env = gym.make(
-            "CarRacing-v3", render_mode="human" if render else None, continuous=False
-        )
         if is_training:
             start_time = datetime.now()
             last_graph_update_time = start_time
@@ -61,6 +64,7 @@ class DQN:
             with open(self.LOG_FILE, 'w') as file:
                 file.write(message + "\n")
                 
+        env = gym.make(self.env_id, render_mode="human" if render else None, continuous=False)
         env = ImageEnv(env)
 
         state_dim = (4, 84, 84)
@@ -72,10 +76,15 @@ class DQN:
             # Initialize epsilon and replay buffer
             replay_buffer = ReplayBuffer(self.replay_buffer_size)
             epsilon = self.epsilon_init
+            
+            # Create the target network and sync it to policy network
             target_net = CNNActionValue(state_dim[0], action_dim).to(device)
-            # sync target network to policy network
             target_net.load_state_dict(policy_net.state_dict())
 
+            # Policy network optimizer
+            self.optimizer = torch.optim.Adam(policy_net.parameters(), lr=self.learning_rate_a)
+            
+            # Tracked for syncing policy and target network
             step_count = 0
 
             # policy network optimizer
@@ -96,7 +105,6 @@ class DQN:
             while not terminated:
                 if is_training and random.random() < epsilon:
                     action = env.action_space.sample()
-                    # action = torch.tensor(action, dtype=torch.float, device=device)
                 else:
                     with torch.no_grad():
                         # tensor([1, 2, 3, ...]) ===> tensor([[1, 2, 3, ...]])
@@ -123,11 +131,6 @@ class DQN:
                     break
 
             rewards_per_episode.append(episode_reward)
-
-            epsilon = max(epsilon * self.epsilon_decay, self.epsilon_min)
-            epsilon_history.append(epsilon)
-
-            # if we have enough experiences
             
             # Save model wehn new best reward is obtained
             if is_training:
@@ -145,10 +148,14 @@ class DQN:
                     self.save_graph(rewards_per_episode, epsilon_history)
                     last_graph_update_time = current_time
 
+            # If we have enough experiences
             if len(replay_buffer) > self.mini_batch_size:
-                # sample from memory
                 mini_batch = replay_buffer.sample(self.mini_batch_size)
                 self.optimize(mini_batch, policy_net, target_net)
+                
+                # Decay epsilon
+                epsilon = max(epsilon * self.epsilon_decay, self.epsilon_min)
+                epsilon_history.append(epsilon)
 
                 # copy policy network to target network after a certain number of steps
                 if step_count > self.network_sync_rate:
