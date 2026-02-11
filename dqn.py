@@ -35,7 +35,9 @@ class DQN:
             replay_buffer = ReplayBuffer()
             replay_buffer = ReplayBuffer(self.replay_memory_size)
             
+            epsilon = self.epsilon_init
         rewards_per_episode = []
+        epsilon_history = []
 
         # keep training until we are satisfied with results
         for episode in itertools.count():
@@ -44,8 +46,10 @@ class DQN:
             episode_reward = 0.0
             
             while not terminated:
-                # next action
-                action = env.action_space.sample()
+                if is_training and random.sample() < epsilon:
+                    action = env.action_space.sample()
+                else:
+                    action = policy(state).argmax()
                 
                 # processing:
                 new_state, reward, terminated, _, info = env.step(action)
@@ -64,6 +68,8 @@ class DQN:
                     break
                 
         rewards_per_episode.append(episode_reward)
+            epsilon = max(epsilon * self.epsilon_decay, self.epsilon_min)
+            epsilon_history.append(epsilon)
 
         ## env.close() 
 
