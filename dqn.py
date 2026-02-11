@@ -33,6 +33,7 @@ class DQN:
         
         if is_training:
             replay_buffer = ReplayBuffer()
+            replay_buffer = ReplayBuffer(self.replay_memory_size)
             
         rewards_per_episode = []
 
