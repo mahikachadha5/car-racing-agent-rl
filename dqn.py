@@ -8,6 +8,9 @@ from replay_buffer import ReplayBuffer
 import itertools
 import yaml
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
 # Define the model
 class DQN:
     def __init__(self, hyperparameter_set):
@@ -28,9 +31,9 @@ class DQN:
         
         state_dim = (4,84,84)
         action_dim = env.action_space.n
-        
-        policy = CNNActionValue(state_dim[0], action_dim)
-        
+
+        policy = CNNActionValue(state_dim[0], action_dim).to(device)
+
         if is_training:
             replay_buffer = ReplayBuffer()
             replay_buffer = ReplayBuffer(self.replay_memory_size)
@@ -42,6 +45,7 @@ class DQN:
         # keep training until we are satisfied with results
         for episode in itertools.count():
             state, _ = env.reset()
+            state = torch.tensor(state, dtype=torch.float, device=device)
             terminated = False
             episode_reward = 0.0
             
@@ -49,14 +53,19 @@ class DQN:
                 if is_training and random.sample() < epsilon:
                     action = env.action_space.sample()
                 else:
-                    action = policy(state).argmax()
-                
+                    with torch.no_grad():
+                        # tensor([1, 2, 3, ...]) ===> tensor([[1, 2, 3, ...]])
+                        action = policy(state.unsqueeze(dim=0)).squeeze().argmax()
+
                 # processing:
-                new_state, reward, terminated, _, info = env.step(action)
-                
+                new_state, reward, terminated, _, info = env.step(action.item())
+
                 # accumulate reward
                 episode_reward += reward
-                
+
+                new_state = torch.tensor(new_state, dtype=torch.float, device=device)
+                reward = torch.tensor(reward, dtype=torch.float, device=device)
+
                 if is_training:
                     replay_buffer.append((state, action, new_state, reward, terminated))
                 
