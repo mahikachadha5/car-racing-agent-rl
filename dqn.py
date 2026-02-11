@@ -226,5 +226,13 @@ class DQN:
 
 
 if __name__ == "__main__":
-    agent = DQN("car_racing3")
-    agent.run(is_training=True, render=True)
+    parser = argparse.ArgumentParser(description='Train or test model.')
+    parser.add_argument('hyperparameters', help='')
+    parser.add_argument('--train',help='Training mode', action='store_true')
+    args = parser.parse_args()
+    dqn = DQN("car_racing3")
+    
+    if args.train:
+        dqn.run(is_training=True)
+    else: 
+        dqn.run(is_training=True, render=True)
