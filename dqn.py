@@ -1,17 +1,60 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+import gymnasium as gym
+from img import ImageEnv
+from cnn import CNNActionValue
+from replay_buffer import ReplayBuffer
+import itertools
 
 # Define the model
 class DQN(nn.Module):
     def __init__(self, in_states, hl_nodes, out_actions):
         super().__init__()
+class DQN:
+    def run(self, is_training=True, render=False):
+        env = gym.make("CarRacing-v3", render_mode="human" if render else None, continuous=False)
+        env = ImageEnv(env)
+        
+        state_dim = (4,84,84)
+        action_dim = env.action_space.n
+        
+        policy = CNNActionValue(state_dim[0], action_dim)
+        
+        if is_training:
+            replay_buffer = ReplayBuffer()
+            
+        rewards_per_episode = []
 
-        # define network layers
-        self.fc1 = nn.Linear(in_states, hl_nodes)  # first fully connected layer
-        self.out = nn.Linear(out_actions, hl_nodes)  # output layer
+        # keep training until we are satisfied with results
+        for episode in itertools.count():
+            state, _ = env.reset()
+            terminated = False
+            episode_reward = 0.0
+            
+            while not terminated:
+                # next action
+                action = env.action_space.sample()
+                
+                # processing:
+                new_state, reward, terminated, _, info = env.step(action)
+                
+                # accumulate reward
+                episode_reward += reward
+                
+                if is_training:
+                    replay_buffer.append((state, action, new_state, reward, terminated))
+                
+                # move to the new state  
+                state = new_state
+                
+                # when game is over, break
+                if terminated:
+                    break
+                
+        rewards_per_episode.append(episode_reward)
 
-    def forward(self, x):
-        x = F.relu(self.fc1(x))  # apply ReLu (rectified linear unit) activation
-        x = self.out(x)  # calculate output
-        return x
+        ## env.close() 
+
+    
+    
