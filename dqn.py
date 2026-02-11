@@ -68,6 +68,7 @@ class DQN:
                     break
                 
         rewards_per_episode.append(episode_reward)
+            rewards_per_episode.append(episode_reward)
             epsilon = max(epsilon * self.epsilon_decay, self.epsilon_min)
             epsilon_history.append(epsilon)
 
