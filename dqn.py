@@ -6,12 +6,22 @@ from img import ImageEnv
 from cnn import CNNActionValue
 from replay_buffer import ReplayBuffer
 import itertools
+import yaml
 
 # Define the model
-class DQN(nn.Module):
-    def __init__(self, in_states, hl_nodes, out_actions):
-        super().__init__()
 class DQN:
+    def __init__(self, hyperparameter_set):
+        with open('hyperparameters.yml', 'r') as file:
+            all_hyperparameter_sets = yaml.safe_load(file)
+            hyperparameters = all_hyperparameter_sets[hyperparameter_set]
+        
+        self.replay_memory_size = hyperparameters['replay_memory_size']
+        self.mini_batch_size = hyperparameters['mini_batch_size']
+        self.epsilon_init = hyperparameters['epsilon_init']
+        self.epsilon_decay = hyperparameters['epsilon_decay']
+        self.epsilon_min = hyperparameters['epsilon_min']
+        
+                
     def run(self, is_training=True, render=False):
         env = gym.make("CarRacing-v3", render_mode="human" if render else None, continuous=False)
         env = ImageEnv(env)
