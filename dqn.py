@@ -85,13 +85,24 @@ class DQN:
         policy_net = CNNActionValue(state_dim[0], action_dim).to(device)
 
         if is_training:
-            # Initialize epsilon and replay buffer
-            replay_buffer = ReplayBuffer(self.replay_buffer_size)
-            epsilon = self.epsilon_init
-
-            # Create the target network and sync it to policy network
+            # Create the target network
             target_net = CNNActionValue(state_dim[0], action_dim).to(device)
-            target_net.load_state_dict(policy_net.state_dict())
+
+            # Resuming training
+            if os.path.exists(self.MODEL_FILE):
+                print(
+                    f"{start_time.strftime(DATE_FORMAT)}: Resuming training from checkpoint"
+                )
+                policy_net.load_state_dict(torch.load(self.MODEL_FILE))
+                target_net.load_state_dict(torch.load(self.MODEL_FILE))
+                epsilon = self.epsilon_min
+            else:
+                # Sync if starting fresh and initialize epsilon
+                target_net.load_state_dict(policy_net.state_dict())
+                epsilon = self.epsilon_init
+
+            # Initialize replay buffer
+            replay_buffer = ReplayBuffer(self.replay_buffer_size)
 
             # Policy network optimizer
             self.optimizer = torch.optim.Adam(
