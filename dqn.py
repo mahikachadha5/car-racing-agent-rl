@@ -11,7 +11,7 @@ import random
 import os
 import matplotlib
 import matplotlib.pyplot as plt
-import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import argparse
 
@@ -61,10 +61,11 @@ class DQN:
             
             message = f"{start_time.strftime(DATE_FORMAT)}: Training starting..."
             print(message)
-            with open(self.LOG_FILE, 'w') as file:
+            with open(self.LOG_FILE, "w") as file:
                 file.write(message + "\n")
-                
         env = gym.make(self.env_id, render_mode="human" if render else None, continuous=False)
+        env = gym.make(
+            self.env_id, render_mode="human" if render else None, continuous=False
         env = ImageEnv(env)
 
         state_dim = (4, 84, 84)
@@ -125,7 +126,7 @@ class DQN:
 
                 new_state = torch.tensor(new_state, dtype=torch.float, device=device)
                 reward = torch.tensor(reward, dtype=torch.float, device=device)
-                action = torch.tensor(action, dtype=torch.float, device=device)
+                action = torch.tensor(action, dtype=torch.long, device=device)
 
                 if is_training:
                     replay_buffer.append((state, action, new_state, reward, terminated))
@@ -143,7 +144,7 @@ class DQN:
             # Save model wehn new best reward is obtained
             if is_training:
                 if episode_reward > best_reward:
-                    message = f"{datetime.now().strftime(DATE_FORMAT)}: New best reward {episode_reward:0.1f} ({(episode_reward-best_reward)})"
+                    message = f"{datetime.now().strftime(DATE_FORMAT)}: New best reward {episode_reward:0.1f} ({(episode_reward-best_reward)/best_reward*100:+.1f}%) at episode {episode}, saving model..."
                     print(message)
                     with open(self.LOG_FILE, 'a') as file:
                         file.write(message + '\n')
@@ -206,21 +207,22 @@ class DQN:
         fig = plt.figure()
         
         # Plot avg rewards (Y-axis) vs episodes (X-Axis)
-        mean_rewards = np.zeroes(len(rewards_per_episode))
+        plt.subplot(121)
+        mean_rewards = np.zeros(len(rewards_per_episode))
         for x in range(len(mean_rewards)):
             mean_rewards[x] = np.mean(rewards_per_episode[max(0, x-99):(x+1)])
-        plt.subplot(122) # plot on a 1 row x 2 col grid
-        plt.ylabel('Mean Rewards')
+        plt.ylabel("Mean Rewards")
+        plt.xlabel("Episodes")
         plt.plot(mean_rewards)
         
         # Plot epsilon decay (Y-axis) vs episodes (X-axis)
         plt.subplot(122)
-        plt.ylabel('Epsilon Decay')
+        plt.ylabel("Epsilon Decay")
+        plt.xlabel("Episodes")
         plt.plot(epsilon_history)
-        
-        plt.subplots_adjust(wspace=1.0, hspace=1.0)
 
         # Save plots
+        plt.subplots_adjust(wspace=1.0, hspace=1.0)
         fig.savefig(self.GRAPH_FILE)
         plt.close(fig)
 
