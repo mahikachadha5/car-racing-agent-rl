@@ -77,9 +77,6 @@ class DQN:
         env = gym.make(
             self.env_id, render_mode="human" if render else None, continuous=False
         )
-        env = gym.make(
-            self.env_id, render_mode="human" if render else None, continuous=False
-        )
         env = ImageEnv(env)
 
         state_dim = (4, 84, 84)
@@ -148,6 +145,20 @@ class DQN:
                     replay_buffer.append((state, action, new_state, reward, terminated))
                     step_count += 1
 
+                # If we have enough experiences
+                if len(replay_buffer) > self.mini_batch_size:
+                    mini_batch = replay_buffer.sample(self.mini_batch_size)
+                    self.optimize(mini_batch, policy_net, target_net)
+
+                    # Decay epsilon
+                    epsilon = max(epsilon * self.epsilon_decay, self.epsilon_min)
+                    epsilon_history.append(epsilon)
+
+                    # copy policy network to target network after a certain number of steps
+                    if step_count > self.network_sync_rate:
+                        target_net.load_state_dict(policy_net.state_dict())
+                        step_count = 0
+
                 # move to the new state
                 state = new_state
 
@@ -157,7 +168,7 @@ class DQN:
 
             rewards_per_episode.append(episode_reward)
 
-            # Save model wehn new best reward is obtained
+            # Save model when new best reward is obtained
             if is_training:
                 if episode_reward > best_reward:
                     message = f"{datetime.now().strftime(DATE_FORMAT)}: New best reward {episode_reward:0.1f} ({(episode_reward-best_reward)/best_reward*100:+.1f}%) at episode {episode}, saving model..."
@@ -172,20 +183,6 @@ class DQN:
                 if current_time - last_graph_update_time > timedelta(seconds=10):
                     self.save_graph(rewards_per_episode, epsilon_history)
                     last_graph_update_time = current_time
-
-            # If we have enough experiences
-            if len(replay_buffer) > self.mini_batch_size:
-                mini_batch = replay_buffer.sample(self.mini_batch_size)
-                self.optimize(mini_batch, policy_net, target_net)
-
-                # Decay epsilon
-                epsilon = max(epsilon * self.epsilon_decay, self.epsilon_min)
-                epsilon_history.append(epsilon)
-
-                # copy policy network to target network after a certain number of steps
-                if step_count > self.network_sync_rate:
-                    target_net.load_state_dict(policy_net.state_dict())
-                    step_count = 0
 
     # Calculates target and trains the policy network
     def optimize(self, mini_batch, policy_net, target_net):
@@ -249,7 +246,7 @@ if __name__ == "__main__":
     parser.add_argument("hyperparameters", help="")
     parser.add_argument("--train", help="Training mode", action="store_true")
     args = parser.parse_args()
-    dqn = DQN("car_racing3")
+    dqn = DQN(hyperparameter_set=args.hyperparameters)
 
     if args.train:
         dqn.run(is_training=True)
