@@ -1,4 +1,4 @@
-car_racing3:
+car_racing1:
   env_id: CarRacing-v3
   replay_buffer_size: 100000
   mini_batch_size: 32

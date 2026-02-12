@@ -225,26 +225,21 @@ class DQN:
         self.optimizer.step()  # Update network parameters i.e. weights and biases
 
     def save_graph(self, rewards_per_episode, epsilon_history):
-        # Save plots
-        fig = plt.figure()
-
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
         # Plot avg rewards (Y-axis) vs episodes (X-Axis)
-        plt.subplot(121)
         mean_rewards = np.zeros(len(rewards_per_episode))
         for x in range(len(mean_rewards)):
             mean_rewards[x] = np.mean(rewards_per_episode[max(0, x - 99) : (x + 1)])
-        plt.ylabel("Mean Rewards")
-        plt.xlabel("Episodes")
-        plt.plot(mean_rewards)
+        ax1.plot(mean_rewards)
+        ax1.set_ylabel("Mean Rewards")
+        ax1.set_xlabel("Episodes")
 
         # Plot epsilon decay (Y-axis) vs episodes (X-axis)
-        plt.subplot(122)
-        plt.ylabel("Epsilon Decay")
-        plt.xlabel("Episodes")
-        plt.plot(epsilon_history)
+        ax2.plot(epsilon_history)
+        ax2.set_ylabel("Epsilon Decay")
+        ax2.set_xlabel("Episodes")
 
-        # Save plots
-        plt.subplots_adjust(wspace=1.0, hspace=1.0)
+        plt.tight_layout()
         fig.savefig(self.GRAPH_FILE)
         plt.close(fig)
 
