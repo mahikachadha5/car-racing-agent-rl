@@ -163,7 +163,6 @@ class DQN:
 
                     # Decay epsilon
                     epsilon = max(epsilon * self.epsilon_decay, self.epsilon_min)
-                    epsilon_history.append(epsilon)
 
                     # copy policy network to target network after a certain number of steps
                     if step_count > self.network_sync_rate:
@@ -178,6 +177,7 @@ class DQN:
                     break
 
             rewards_per_episode.append(episode_reward)
+            epsilon_history.append(epsilon)
 
             # Save model when new best reward is obtained
             if is_training:
