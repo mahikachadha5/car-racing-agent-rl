@@ -95,11 +95,11 @@ class DQN:
                 )
                 policy_net.load_state_dict(torch.load(self.MODEL_FILE))
                 target_net.load_state_dict(torch.load(self.MODEL_FILE))
-                epsilon = self.epsilon_min
             else:
                 # Sync if starting fresh and initialize epsilon
                 target_net.load_state_dict(policy_net.state_dict())
-                epsilon = self.epsilon_init
+            
+            epsilon = self.epsilon_init
 
             # Initialize replay buffer
             replay_buffer = ReplayBuffer(self.replay_buffer_size)
