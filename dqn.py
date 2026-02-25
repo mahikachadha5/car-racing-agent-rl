@@ -24,7 +24,11 @@ os.makedirs(RUNS_DIR, exist_ok=True)
 # To save plots as images
 matplotlib.use("Agg")
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps" if torch.backends.mps.is_available() else "cpu"
+)
 
 
 # Deep Q-Learning Agent
@@ -98,7 +102,7 @@ class DQN:
             else:
                 # Sync if starting fresh and initialize epsilon
                 target_net.load_state_dict(policy_net.state_dict())
-            
+
             epsilon = self.epsilon_init
 
             # Initialize replay buffer
@@ -128,53 +132,50 @@ class DQN:
         # Keep training until we are satisfied with results or need to tweak hyperparameters
         for episode in itertools.count():
             state, _ = env.reset()
-            state = torch.tensor(state, dtype=torch.float, device=device)
+            state = torch.tensor(state, dtype=torch.float)
             terminated = False
+            truncated = False
             episode_reward = 0.0
 
-            while not terminated:
+            while not terminated and not truncated:
                 if is_training and random.random() < epsilon:
                     action = env.action_space.sample()
                 else:
                     with torch.no_grad():
                         # tensor([1, 2, 3, ...]) ===> tensor([[1, 2, 3, ...]])
                         action = (
-                            policy_net(state.unsqueeze(dim=0)).squeeze().argmax().item()
+                            policy_net(state.unsqueeze(dim=0).to(device)).squeeze().argmax().item()
                         )
 
                 # processing:
-                new_state, reward, terminated, _, info = env.step(action)
+                new_state, reward, terminated, truncated, info = env.step(action)
 
                 # accumulate reward
                 episode_reward += reward
 
-                new_state = torch.tensor(new_state, dtype=torch.float, device=device)
-                reward = torch.tensor(reward, dtype=torch.float, device=device)
-                action = torch.tensor(action, dtype=torch.long, device=device)
+                new_state = torch.tensor(new_state, dtype=torch.float)
+                reward = torch.tensor(reward, dtype=torch.float)
+                action = torch.tensor(action, dtype=torch.long)
 
                 if is_training:
                     replay_buffer.append((state, action, new_state, reward, terminated))
                     step_count += 1
 
-                # If we have enough experiences
-                if len(replay_buffer) > self.mini_batch_size:
+                # If we have enough experiences, train every 4 steps
+                if len(replay_buffer) > self.mini_batch_size and step_count % 4 == 0:
                     mini_batch = replay_buffer.sample(self.mini_batch_size)
                     self.optimize(mini_batch, policy_net, target_net)
-
-                    # Decay epsilon
-                    epsilon = max(epsilon * self.epsilon_decay, self.epsilon_min)
 
                     # copy policy network to target network after a certain number of steps
                     if step_count > self.network_sync_rate:
                         target_net.load_state_dict(policy_net.state_dict())
                         step_count = 0
 
+                # Decay epsilon every step (independent of training)
+                epsilon = max(epsilon * self.epsilon_decay, self.epsilon_min)
+
                 # move to the new state
                 state = new_state
-
-                # when game is over, break
-                if terminated:
-                    break
 
             rewards_per_episode.append(episode_reward)
             epsilon_history.append(epsilon)
@@ -202,12 +203,12 @@ class DQN:
         # Transpose the list of experiences and separate at each element
         states, actions, new_states, rewards, terminations = zip(*mini_batch)
 
-        # Stack tensors to create batch tensors
+        # Stack tensors to create batch tensors and move to device
         # tensor([[1,2,3]])
-        states = torch.stack(states)
-        actions = torch.stack(actions)
-        new_states = torch.stack(new_states)
-        rewards = torch.stack(rewards)
+        states = torch.stack(states).to(device)
+        actions = torch.stack(actions).to(device)
+        new_states = torch.stack(new_states).to(device)
+        rewards = torch.stack(rewards).to(device)
         terminations = torch.tensor(terminations).float().to(device)
 
         with torch.no_grad():
