@@ -71,21 +71,14 @@ Epsilon starts at 1.0 (100% random) and decays over time toward a minimum value 
 
 ## Results & Lessons Learned
 
-### Initial Attempt
-
 My first training run plateaued around -800 mean reward after 200 episodes. While the agent occasionally achieved spikes as high as -57, performance was inconsistent and the average showed no upward trend.
 
 **The issue:** My network_sync_rate was too low and the policy was chasing a constantly moving target, leading to unstable learning. 
 
-## Project Structure
-```
-├── dqn.py              # DQN agent and training loop
-├── cnn.py              # CNN architecture for Q-value prediction
-├── replay_buffer.py    # Experience replay implementation
-├── img.py              # Frame preprocessing wrapper
-├── hyperparameters.yml # Training configurations
-├── runs/               # Saved models, logs, and graphs
-└── README.md
-```
+The next run was similar, with a plateau around -500 around 300 episodes. It was at this point where I realized that I had two major bugs: one in my image processing logic and one in my CNNActionValue function. In my image processing function, I was not normalizing pixel values from [0,255] to [0,1]. This meant that the network was receiving large values as inputs, the reason for the slow convergence. The second bug was that I did not run the ReLu function on fc1, causing fc1 and fc2 to collapse into a single layer. 
 
+Fixing these bugs, increasing the mini batch size, and slowing down the epsilon decay, led to great performance. The model sustained a mean reward of ~700 after 3000 episodes. In it's best episodes, the model reached a reward of 900+.
 
+In a future training, some things to change/try include:
+- Use a different RL algorithm like DDQN. DQN often overestimates Q-values because it uses the target network to both estimate and evaluate the best action.
+- Test out a slower epsilon decay (after 600 episodes, the epsilon hits its floor) 
