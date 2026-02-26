@@ -263,4 +263,4 @@ if __name__ == "__main__":
     if args.train:
         dqn.run(is_training=True)
     else:
-        dqn.run(is_training=True, render=True)
+        dqn.run(is_training=False, render=True)
