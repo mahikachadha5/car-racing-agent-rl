@@ -82,3 +82,19 @@ Fixing these bugs, increasing the mini batch size, and slowing down the epsilon 
 In a future training, some things to change/try include:
 - Use a different RL algorithm like DDQN. DQN often overestimates Q-values because it uses the target network to both estimate and evaluate the best action.
 - Test out a slower epsilon decay (after 600 episodes, the epsilon hits its floor) 
+
+### Before Training
+
+https://github.com/user-attachments/assets/5f0e296e-fcbb-45c2-a07b-a571d83098ba
+
+(I have cropped a large portion of this clip because frankly this went on for a while...)
+
+### After Training
+
+https://github.com/user-attachments/assets/2fc9f2d6-c7a2-42e5-ac39-a6c18f7a4f11
+
+
+
+
+
+
