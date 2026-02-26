@@ -129,6 +129,10 @@ class DQN:
             # Evaluate Model
             policy_net.eval()
 
+            epsilon = self.epsilon_min
+            epsilon_history = []
+            rewards_per_episode = []
+
         # Keep training until we are satisfied with results or need to tweak hyperparameters
         for episode in itertools.count():
             state, _ = env.reset()
@@ -162,7 +166,7 @@ class DQN:
                     step_count += 1
 
                 # If we have enough experiences, train every 4 steps
-                if len(replay_buffer) > self.mini_batch_size and step_count % 4 == 0:
+                if is_training and len(replay_buffer) > self.mini_batch_size and step_count % 4 == 0:
                     mini_batch = replay_buffer.sample(self.mini_batch_size)
                     self.optimize(mini_batch, policy_net, target_net)
 
